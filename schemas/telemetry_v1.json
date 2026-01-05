@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "telemetry.v1",
+  "title": "Telemetry Event",
+  "description": "텔레메트리 이벤트 스키마",
+  "type": "object",
+  "required": ["event_id", "twin_id", "asset_id", "ts", "metrics"],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "이벤트 고유 식별자"
+    },
+    "twin_id": {
+      "type": "string",
+      "description": "디지털 트윈 식별자"
+    },
+    "asset_id": {
+      "type": "string",
+      "description": "물리적 자산 식별자"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "타임스탬프 (RFC3339)"
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      },
+      "description": "메트릭 키-값 쌍"
+    },
+    "tags": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "메타데이터 태그"
+    },
+    "quality": {
+      "type": "object",
+      "properties": {
+        "data_quality_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "missing_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "description": "데이터 품질 정보"
+    }
+  }
+}

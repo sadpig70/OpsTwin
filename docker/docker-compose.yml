@@ -1,0 +1,104 @@
+# OpsTwin Docker Compose 설정
+version: "3.9"
+
+services:
+  # OpsTwin API 서버
+  opstwin:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: opstwin-api
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql://opstwin:opstwin@timescaledb:5432/opstwin
+      - REDIS_URL=redis://redis:6379/0
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      redis:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - opstwin-network
+
+  # Redis (커서 관리, 캐싱)
+  redis:
+    image: redis:7-alpine
+    container_name: opstwin-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - opstwin-network
+
+  # TimescaleDB (시계열 데이터)
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: opstwin-timescaledb
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=opstwin
+      - POSTGRES_PASSWORD=opstwin
+      - POSTGRES_DB=opstwin
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U opstwin" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - opstwin-network
+
+  # Kafka (이벤트 스트리밍) - 선택적
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: opstwin-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - opstwin-network
+    profiles:
+      - kafka
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: opstwin-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      - zookeeper
+    networks:
+      - opstwin-network
+    profiles:
+      - kafka
+
+networks:
+  opstwin-network:
+    driver: bridge
+
+volumes:
+  redis-data:
+  timescale-data:
